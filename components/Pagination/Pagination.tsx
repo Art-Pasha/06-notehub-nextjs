@@ -5,16 +5,33 @@ import ReactPaginateModule from 'react-paginate';
 import type { ReactPaginateProps } from 'react-paginate';
 import css from './Pagination.module.css';
 
-type ModuleWithDefault<T> = { default: T };
+type PaginateComponent = ComponentType<ReactPaginateProps>;
+type PossiblyWrapped =
+  | PaginateComponent
+  | { default: PaginateComponent | { default: PaginateComponent } };
 
-// react-paginate — UMD-пакет, чей default-експорт при production-збірці
-// на сучасних версіях Vite/Next.js подвійно обгортається. Розпаковуємо
-// його з коректною типізацією замість `any`.
-const ReactPaginate = (
-  ReactPaginateModule as unknown as ModuleWithDefault<
-    ComponentType<ReactPaginateProps>
-  >
-).default;
+// react-paginate — старый UMD-пакет. Разные бандлери (Vite/esbuild на
+// клієнті та Next.js/webpack на сервері при SSR-пререндері) по-різному
+// розгортають його default-експорт: іноді напряму, іноді один раз
+// обгорнутий, іноді двічі. Тому визначаємо глибину розгортання в
+// рантаймі за допомогою typeof, а не жорстко "зашиваємо" один варіант.
+function resolvePaginateComponent(mod: PossiblyWrapped): PaginateComponent {
+  if (typeof mod === 'function') {
+    return mod;
+  }
+
+  const level1 = mod.default;
+
+  if (typeof level1 === 'function') {
+    return level1;
+  }
+
+  return level1.default;
+}
+
+const ReactPaginate = resolvePaginateComponent(
+  ReactPaginateModule as unknown as PossiblyWrapped
+);
 
 interface PaginationProps {
   pageCount: number;
